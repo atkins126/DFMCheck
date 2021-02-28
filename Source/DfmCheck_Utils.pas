@@ -1,14 +1,9 @@
-{******************************************************************************}
-{*                                                                            *}
-{* DfmCheck                                                                   *}
-{*                                                                            *}
-{* (C) 2006 Andreas Hausladen                                                 *}
-{*                                                                            *}
-{******************************************************************************}
-
 unit DfmCheck_Utils;
 
 {$I DfmCheck.inc}
+{$IFDEF UNICODE}
+  {$WARN WIDECHAR_REDUCED OFF}
+{$ENDIF UNICODE}
 
 interface
 
@@ -571,6 +566,7 @@ var
   N, FN: string;
   Parser: TPascalParser;
   Token: PTokenInfo;
+  NxtToken: PTokenInfo;
   RemoveStartIndex: Integer;
 
   function NextToken(out Token: PTokenInfo): Boolean;
@@ -596,7 +592,20 @@ begin
           while NextToken(Token) do
           begin
             FN := '';
+
             N := Token.Value;
+
+            // Unit mit Namespace
+            while (Parser.GetToken(NxtToken, True) and (NxtToken.Kind = tkSymbol) and (NxtToken.Value = '.')) do
+            begin
+              N := N + '.';
+
+              NextToken(Token); // .
+
+              NextToken(Token); // Namespace/Name
+              N := N + Token.Value;
+            end;
+
             if SameText(N, UnitName) then
             begin
               if RemoveUnit then

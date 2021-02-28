@@ -1,29 +1,10 @@
-{**************************************************************************************************}
-{                                                                                                  }
-{ Delphi language Preprocessor (dpp32)                                                             }
-{                                                                                                  }
-{ The contents of this file are subject to the Mozilla Public License Version 1.1 (the "License"); }
-{ you may not use this file except in compliance with the License. You may obtain a copy of the    }
-{ License at http://www.mozilla.org/MPL/                                                           }
-{                                                                                                  }
-{ Software distributed under the License is distributed on an "AS IS" basis, WITHOUT WARRANTY OF   }
-{ ANY KIND, either express or implied. See the License for the specific language governing rights  }
-{ and limitations under the License.                                                               }
-{                                                                                                  }
-{ The Original Code is dpp_PascalParser.pas                                                        }
-{                                                                                                  }
-{ The Initial Developer of the Original Code is Andreas Hausladen                                  }
-{ Portions created by these individuals are Copyright (C) of these individuals.                    }
-{                                                                                                  }
-{ You may retrieve the latest version of this file at the Projects home page, located at           }
-{ http://www.sourceforge.net/projects/dpp32                                                        }
-{                                                                                                  }
-{**************************************************************************************************}
-// $Id: dpp_PascalParser.pas 9961 2005-09-11 19:20:57Z ahuser $
-
 unit DfmCheck_PascalParser;
 
 interface
+
+{$IFDEF UNICODE}
+  {$WARN WIDECHAR_REDUCED OFF}
+{$ENDIF UNICODE}
 
 uses
   SysUtils, Classes;
@@ -76,8 +57,8 @@ type
     constructor Create(const AFileName, AText: string; StartLineNum: Integer = 1);
     destructor Destroy; override;
 
-    function GetToken: PTokenInfo; overload;
-    function GetToken(out p: PTokenInfo): Boolean; overload;
+    function GetToken(const ALookAhead: Boolean = False): PTokenInfo; overload;
+    function GetToken(out p: PTokenInfo; const ALookAhead: Boolean = False): Boolean; overload;
 
     procedure Delete(StartIndex, Count: Integer);
     procedure Insert(Index: Integer; const S: string);
@@ -105,17 +86,24 @@ implementation
 
 { TPascalParser }
 
-function TPascalParser.GetToken: PTokenInfo;
+function TPascalParser.GetToken(const ALookAhead: Boolean = False): PTokenInfo;
 var
   PText, F, P: PChar;
   IndexAdd: Integer;
   IsDecimal: Boolean;
   IsExp: Boolean;
   IsExpSign: Boolean;
+
+  Idx: Integer;
+  LineNum: Integer;
+  TokenIdx: Integer;
 begin
   Result := nil;
   if FIndex > FTextLen then
     Exit;
+
+  LineNum := FLineNum;
+  TokenIdx := FTokenIndex;
 
   PText := Pointer(FText);
   P := PText + FIndex - 1;
@@ -123,19 +111,19 @@ begin
   while P[0] in WhiteChars do
   begin
     if P[0] = #10 then
-      Inc(FLineNum);
+      Inc(LineNum);
     Inc(P);
   end;
 
   if P[0] = #0 then
     Exit;
 
-  Inc(FTokenIndex);
-  if FTokenIndex >= MaxCachedTokens then
-    FTokenIndex := 0; // ring buffer
+  Inc(TokenIdx);
+  if TokenIdx >= MaxCachedTokens then
+    TokenIdx := 0; // ring buffer
 
-  Result := FTokens[FTokenIndex];
-  Result.StartLine := FLineNum;
+  Result := FTokens[TokenIdx];
+  Result.StartLine := LineNum;
   Result.StartIndex := P - PText + 1;
   Result.ExKind := tekNone;
 
@@ -187,7 +175,7 @@ begin
         #0, '}':
           Break;
         #10:
-          Inc(FLineNum);
+          Inc(LineNum);
       end;
       Inc(P);
     end;
@@ -210,7 +198,7 @@ begin
     while (P[0] <> #0) and not ((P[0] = '*') and (P[1] = ')')) do
     begin
       if P[0] = #10 then
-        Inc(FLineNum);
+        Inc(LineNum);
       Inc(P);
     end;
     Result.Kind := tkComment;
@@ -228,7 +216,7 @@ begin
     begin
       if P[0] = #13 then
         IndexAdd := 1; {do not parse the #13 again}
-      Inc(FLineNum);
+      Inc(LineNum);
       Inc(IndexAdd); {do not parse the #10 again}
     end;
   end
@@ -327,13 +315,21 @@ begin
       Inc(P);
     Result.Kind := tkSymbol;
   end;
-  FIndex := P - PText + 1;
 
-  Result.EndLine := FLineNum;
-  Result.EndIndex := FIndex - 1;
+  Idx := P - PText + 1;
+
+  Result.EndLine := LineNum;
+  Result.EndIndex := Idx - 1;
   SetString(Result.Value, F, P - F);
 
-  Inc(FIndex, IndexAdd); // skip some chars if necessary
+  if (not ALookAhead) then
+  begin
+    FIndex := Idx;
+    FLineNum := LineNum;
+    FTokenIndex := TokenIdx;
+
+    Inc(FIndex, IndexAdd); // skip some chars if necessary
+  end;
 end;
 
 constructor TPascalParser.Create(const AFilename, AText: string;
@@ -413,9 +409,9 @@ begin
   FTokenIndex := -1;
 end;
 
-function TPascalParser.GetToken(out p: PTokenInfo): Boolean;
+function TPascalParser.GetToken(out p: PTokenInfo; const ALookAhead: Boolean = False): Boolean;
 begin
-  p := GetToken;
+  p := GetToken(ALookAhead);
   Result := p <> nil;
 end;
 

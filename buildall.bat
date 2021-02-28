@@ -7,16 +7,24 @@ SET BORLAND=C:\Borland
 SET CODEGEAR=C:\CodeGear
 SET EMBT=C:\Program Files (x86)\Embarcadero
 SET OLDPATH=%PATH%
-SET SYSDIR=%windir%\SysWOW64
 SET ISCC="C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
 SET ZIP="C:\Program Files\7-Zip\7z.exe"
 
-"%EMBT%\RAD Studio\8.0\Bin\brcc32.exe" Version.rc -foVersion.res
+if exist "%EMBT%\RAD Studio\8.0\Bin\brcc32.exe"   "%EMBT%\RAD Studio\8.0\Bin\brcc32.exe" Version.rc -foVersion.res
 
 if not exist "%DIR%\bin" md "%DIR%\bin"
 if not exist "%DIR%\lib" md "%DIR%\lib"
 
 ::goto Setup
+echo === Delphi 10.4 Sydney =======================
+
+SET PATH=%EMBT%\Studio\21.0\Bin;%OLDPATH%
+call rsvars.bat
+cd source
+msbuild /t:Clean DfmCheckD104.dproj
+msbuild /p:Configuration=Release DfmCheckD104.dproj
+
+
 echo === Delphi 10.3 Rio =======================
 
 SET PATH=%EMBT%\Studio\20.0\Bin;%OLDPATH%
@@ -201,7 +209,7 @@ cd ..
 
 echo === Installer =============================
 :Setup
-if not exist "Instaler" goto Leave
+if not exist "Installer" goto Leave
 cd Installer
 %ISCC% DfmCheck.iss
 if ERRORLEVEL 1 goto Error1
